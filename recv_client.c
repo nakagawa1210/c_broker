@@ -14,7 +14,7 @@
 #define CLOCK_HZ 2600000000.0
 #define PORT_NO 9872
 #define MAX_BUF_SIZE 5000
-#define MAX_COUNT 1000
+#define MAX_COUNT 100000
 
 /* Read "n" bytes from a descriptor. */
 ssize_t readn(int fd, void *buf, size_t count)
@@ -68,7 +68,6 @@ ssize_t writen(int fd,const void *vptr, size_t n)
 
 void recv_msg(char *host, int count)
 {
-  printf("recv\n");
   char buf[MAX_BUF_SIZE];
   uint64_t recv_time[MAX_COUNT][4];
   int datanum = 0;
@@ -121,7 +120,7 @@ void recv_msg(char *host, int count)
       break;
     }
   }
-  printf("con\n");
+
 
   unsigned int tsc_l, tsc_u; //uint32_t
   unsigned long int tsc; //uint64_t
@@ -134,13 +133,11 @@ void recv_msg(char *host, int count)
     readn(fd, setdata, 8);
     
     memcpy(&winsize,&setdata[0],4);
-    //winsize = (int)setdata[0];
+    printf("win%d\n",winsize);
     size = (int)setdata[4];
 
     size = size * 1024;
-    printf("win%d\n",winsize);
-    printf("siz%d\n",size);
-    
+    printf("size%d\n",size);
     for (int i = 0;i < winsize; i++){
       readn(fd, buf, size + 36);
       rdtsc_64(tsc_l, tsc_u);
@@ -150,14 +147,14 @@ void recv_msg(char *host, int count)
       memcpy(&recv_time[datanum][2], &buf[size +28], sizeof(unsigned long int));
       memcpy(&recv_time[datanum][3], &log_tsc, sizeof(unsigned long int));
       datanum++;
+      printf("num%d\n",datanum);
       }
     writen(fd, ack, 4);
-    printf("ack\n");
+  printf("ack\n");
     if(datanum == count)break;
   }
+  printf("break\n");
   writen(fd, enddata, sizeof(enddata));
-  printf("close\n");
-	
 //	rdtsc_64(tsc_l, tsc_u);
 //	log_tsc[3][count] = (unsigned long int)tsc_u<<32 | tsc_l;
 //	memcpy(&log_tsc[0][count], buf, sizeof(unsigned long int));
@@ -170,8 +167,9 @@ void recv_msg(char *host, int count)
 //
 //  start = log_tsc[0][0];
 //
+  printf("num,send,svr_in,svr_out,recv\n");
   for (int i = 0; i < count; i++) {
-    printf("%lf, %lf, %lf, %lf\n",
+    printf("%d,%lf,%lf,%lf,%lf\n",i,
 	   (recv_time[i][0]) / CLOCK_HZ,
 	   (recv_time[i][1]) / CLOCK_HZ,
 	   (recv_time[i][2]) / CLOCK_HZ,
@@ -187,10 +185,7 @@ void recv_msg(char *host, int count)
 
 int main(int argc, char *argv[])
 {
-  printf("start\n");
-  
   recv_msg("localhost", atoi(argv[1]));
   
-  printf("prd_time, recv_time, send_time, cons_time, prd2cons_time, prd2recv_time, recv2send_time, send2cons_time\n");
   return 0;
 }

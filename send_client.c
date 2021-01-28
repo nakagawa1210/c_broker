@@ -118,7 +118,7 @@ void send_msg (char *host, int count, int len, int winsize)
   
   memcpy(&buf[0],&len,sizeof(len));
   memcpy(&buf[4],&command,sizeof(command));
-  memcpy(&buf[8],&dest,sizeof(dest));
+  memcpy(&buf[8],&winsize,sizeof(winsize));
   
   while (1) {
 	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {

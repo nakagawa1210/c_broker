@@ -8,4 +8,4 @@ send: send_client.c
 recv: recv_client.c
 	gcc recv_client.c -o recv_client -std=gnu99
 svr: server.c
-	gcc server.c -o server -std=gnu99
+	gcc server.c -pthread -o server -std=gnu99

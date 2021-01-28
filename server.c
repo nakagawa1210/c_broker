@@ -10,11 +10,12 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define SERVER_PORT 9872
 #define MAX_EVENTS 3000
 #define BACKLOG 10
-#define MAX_COUNT 50000
+#define MAX_COUNT 100000
 #define MAX_BUF_SIZE 1024
 #define MAX_FD_SIZE 1024
 #define HEAD_MAX 1000
@@ -27,11 +28,15 @@ char array[100000][5000];
 int datanum = 0;
 int recvnum = 0;
 
+//pthread_mutex_t mutex;
+
 void ackset(char *buf)
 {
-  int num = datanum - recvnum;
-  memcpy(&buf[0], &num ,sizeof(num));
-  int size = (int)array[num-1][0];
+  while((datanum - recvnum) <= 0){
+    usleep(100000);
+  }
+  memcpy(&buf[0], &array[0][8], 4);
+  int size = (int)array[recvnum][0];
   memcpy(&buf[4], &size,sizeof(size));  
 }
 
@@ -121,10 +126,12 @@ ssize_t readn(int fd, void *buf, size_t count)
   return count;
 }
 int send_msg(int length, int winsize,int fd)
-{
+{ 
   char buf[length + 20];
   unsigned int tsc_l, tsc_u;
   unsigned long int log_tsc;
+
+  printf("send\n");
 
   for(int i = 0; i< winsize ;i++){
     readn(fd, &buf, length + 20);
@@ -132,15 +139,12 @@ int send_msg(int length, int winsize,int fd)
     log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
 
     memcpy(&array[datanum][0], buf,sizeof(buf));
-    printf("buf%d\n",sizeof(buf));
     memcpy(&array[datanum][sizeof(buf)] ,&log_tsc ,sizeof(log_tsc));
-    printf("tsc%d\n",sizeof(log_tsc));
     datanum++;	     
   }
-  
+
   char ack[4] = "ack";
   writen(fd, ack, 4);
-  printf("%s\n",ack);
   return 0;
 }
 
@@ -149,12 +153,12 @@ int recv_msg(int fd, char *buf)
   unsigned int tsc_l, tsc_u;
   unsigned long int log_tsc;
 
-  //int winsize = (int)buf[0];
+  printf("recv\n");
+  
   int winsize;
   memcpy(&winsize,&buf[0],4);
-  printf("win%d\n",winsize);
   int size = (int)buf[4] * 1024;
-
+ 
   for(int i = 0; i< winsize ;i++){
     rdtsc_64(tsc_l, tsc_u);
     log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
@@ -162,9 +166,9 @@ int recv_msg(int fd, char *buf)
     writen(fd, &array[recvnum], size + 36);
     recvnum++;
   }
+  
   char ack[4];
   readn(fd, ack, 4);
-  printf("ack\n");
   return 0;
 }
 
@@ -183,13 +187,11 @@ int analyze(char *data, int fd){
   switch (command){
   case 1 :
     writen(fd, ack, 4);
-    printf("send\n");
     res = send_msg(length * 1024,winsize,fd);
     break;
   case 2 :
     ackset(rack);
     writen(fd, rack, 8);
-    printf("recv\n");
     res = recv_msg(fd, rack);
     break;
   case 9 :
@@ -201,26 +203,31 @@ int analyze(char *data, int fd){
   }
   return res;
 }
+void *loop (void* pArg){
+  int *fd = (int*) pArg;
+  char buf[16];
+  int res;
+  while(1){
+    readn(*fd, buf, 16);
+    res = analyze(buf, *fd);
+    if(res)break;
+  }
+}
 
 int main()
 {
-  printf("start\n");
-  
+  pthread_t handle;
   listener = setup_socket();
   struct sockaddr_in client_addr;
   socklen_t client_addr_len = sizeof client_addr;
-  int fd;
-  char buf[16];
-  int res; 
-  while (fd = accept(listener, (struct sockaddr *) &client_addr, &client_addr_len))
-  {
-    while (1){
-    readn(fd, buf, 16);
-    res = analyze(buf, fd);
-    if(res)break;
-    }
-    printf("datanum%d\n",datanum);
-  }
   
+  int i=0;
+  for(i;i<2;i++){
+    int fd = accept(listener,(struct sockaddr *) &client_addr, &client_addr_len);
+    pthread_create(&handle, NULL, loop, &fd);
+  }
+  while (1){
+
+  }
   return 0;
 }
