@@ -9,12 +9,21 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdlib.h>
+#include <netinet/tcp.h>
 #define rdtsc_64(lower, upper) asm __volatile ("rdtsc" : "=a"(lower), "=d" (upper));
 
 #define CLOCK_HZ 2600000000.0
 #define PORT_NO 9872
 #define MAX_BUF_SIZE 5000
 #define MAX_COUNT 100000
+
+unsigned long int gettsc()
+{
+  unsigned int tsc_l, tsc_u; //uint32_t
+
+  rdtsc_64(tsc_l, tsc_u);
+  return (unsigned long int)tsc_u<<32 | tsc_l;
+}
 
 /* Read "n" bytes from a descriptor. */
 ssize_t readn(int fd, void *buf, size_t count)
@@ -73,6 +82,7 @@ void recv_msg(char *host, int count)
   int datanum = 0;
   int size = 0;
   int fd = socket(AF_INET, SOCK_STREAM, 0);
+  unsigned long int tsc; //uint64_t
 
   uint64_t end = 0;
 
@@ -121,25 +131,23 @@ void recv_msg(char *host, int count)
     }
   }
 
+  int on=1;
+  int ret;
+	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
 
-  unsigned int tsc_l, tsc_u; //uint32_t
-  unsigned long int tsc; //uint64_t
   unsigned long int log_tsc;
   char setdata[8];
   
   while(1) {
     writen(fd, iddata, sizeof(iddata));
-    printf("num:%d\n",datanum);
     readn(fd, setdata, 8);
-    printf("num:%d\n",datanum);
     memcpy(&size,&setdata[0],4);
     memcpy(&winsize,&setdata[4],4);
     size = size * 1024;
 
     for (int i = 0;i < winsize; i++){
       readn(fd, buf, size + 36);
-      rdtsc_64(tsc_l, tsc_u);
-      log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
+      log_tsc = gettsc();
       memcpy(&recv_time[datanum][0], &buf[size +12], sizeof(unsigned long int));
       memcpy(&recv_time[datanum][1], &buf[size +20], sizeof(unsigned long int));
       memcpy(&recv_time[datanum][2], &buf[size +28], sizeof(unsigned long int));
@@ -149,7 +157,6 @@ void recv_msg(char *host, int count)
     
     char ack[4] = "ack";
     writen(fd, ack, sizeof(ack));
-    printf("num:%d\n",datanum);
     if(datanum == count)break;
   }
   

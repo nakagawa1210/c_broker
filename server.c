@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <netinet/tcp.h>
 
 #define SERVER_PORT 9872
 #define MAX_EVENTS 3000
@@ -158,9 +159,6 @@ int recv_msg(int fd, char *databuf)
   memcpy(&size,&databuf[0],4);
   memcpy(&winsize,&databuf[4],4);
   size = size * 1024;
-
-  printf("size%d\n",size);
-  printf("win%d\n",winsize);
   
   for(int i = 0; i< winsize ;i++){
     while((datanum - recvnum) <= 0){
@@ -173,10 +171,9 @@ int recv_msg(int fd, char *databuf)
     writen(fd, &array[recvnum], size + 36);
     recvnum++;
   }
-  printf("num%d\n",recvnum);
-  int aaa = readn(fd, recvack, sizeof(recvack));
-  printf("ack%d\n",sizeof(recvack));
-  printf("read%s, aaa:%d\n",recvack, aaa);
+ 
+  readn(fd, recvack, sizeof(recvack));
+  //printf("num:%d\n",recvnum);
   return 0;
 }
 
@@ -215,20 +212,15 @@ int analyze(char *data, int fd){
   return res;
 }
 void *loop (void* pArg){
-  int *fd = (int*) pArg;
+  int *fdp = (int*) pArg;
   char buf[16];
   int res;
-  printf("fd%d\n",*fd);
+  int fd = *fdp;
   while(1){
-    readn(*fd, buf, 16);
-    res = analyze(buf, *fd);
+    readn(fd, buf, 16);
+    res = analyze(buf, fd);
     if(res)break;
   }
-}
-
-void dummy()
-{
-  printf("sigpipe\n");
 }
 
 int main()
@@ -237,19 +229,13 @@ int main()
   listener = setup_socket();
   struct sockaddr_in client_addr;
   socklen_t client_addr_len = sizeof client_addr;
-  int rc = 0;
-  struct sigaction act;
-  memset(&act, 0, sizeof(act));
-  act.sa_handler = dummy; 
-  rc = sigaction(SIGPIPE, &act, NULL);
-  if(rc < 0){
-    printf("Error: sigaction() %s\n", strerror(errno));
-    return(-1);
-  }
   
   int i=0;
   for(i;i<2;i++){
     int fd = accept(listener,(struct sockaddr *) &client_addr, &client_addr_len);
+    int on =1;
+    int ret;
+    ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
     pthread_create(&handle, NULL, loop, &fd);
   }
   while (1){
