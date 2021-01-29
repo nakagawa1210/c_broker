@@ -1,3 +1,4 @@
+#define _POSIX_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -11,12 +12,13 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 #define SERVER_PORT 9872
 #define MAX_EVENTS 3000
 #define BACKLOG 10
 #define MAX_COUNT 100000
-#define MAX_BUF_SIZE 1024
+#define MAX_BUF_SIZE 5000
 #define MAX_FD_SIZE 1024
 #define HEAD_MAX 1000
 #define TALE 512
@@ -30,14 +32,13 @@ int recvnum = 0;
 
 //pthread_mutex_t mutex;
 
-void ackset(char *buf)
+void ackset(char *setbuf)
 {
   while((datanum - recvnum) <= 0){
-    usleep(100000);
+    sleep(1);
   }
-  memcpy(&buf[0], &array[0][8], 4);
-  int size = (int)array[recvnum][0];
-  memcpy(&buf[4], &size,sizeof(size));  
+  memcpy(&setbuf[0], &array[recvnum][0], 4);
+  memcpy(&setbuf[4], &array[recvnum][8], 4);
 }
 
 static void die(const char* msg)
@@ -127,58 +128,68 @@ ssize_t readn(int fd, void *buf, size_t count)
 }
 int send_msg(int length, int winsize,int fd)
 { 
-  char buf[length + 20];
+  char sendbuf[MAX_BUF_SIZE];
   unsigned int tsc_l, tsc_u;
   unsigned long int log_tsc;
 
-  printf("send\n");
-
   for(int i = 0; i< winsize ;i++){
-    readn(fd, &buf, length + 20);
+    readn(fd, &sendbuf, length + 20);
     rdtsc_64(tsc_l, tsc_u);
     log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
 
-    memcpy(&array[datanum][0], buf,sizeof(buf));
-    memcpy(&array[datanum][sizeof(buf)] ,&log_tsc ,sizeof(log_tsc));
+    memcpy(&array[datanum][0], sendbuf,length + 20);
+    memcpy(&array[datanum][length + 20] ,&log_tsc ,sizeof(log_tsc));
     datanum++;	     
   }
 
-  char ack[4] = "ack";
-  writen(fd, ack, 4);
+  char sendack[4] = "ack";
+  writen(fd, sendack, sizeof(sendack));
   return 0;
 }
 
-int recv_msg(int fd, char *buf)
+int recv_msg(int fd, char *databuf)
 {
   unsigned int tsc_l, tsc_u;
   unsigned long int log_tsc;
-
-  printf("recv\n");
-  
+  char recvack[4];
+  int size;
   int winsize;
-  memcpy(&winsize,&buf[0],4);
-  int size = (int)buf[4] * 1024;
- 
+  
+  memcpy(&size,&databuf[0],4);
+  memcpy(&winsize,&databuf[4],4);
+  size = size * 1024;
+
+  printf("size%d\n",size);
+  printf("win%d\n",winsize);
+  
   for(int i = 0; i< winsize ;i++){
+    while((datanum - recvnum) <= 0){
+      //usleep(100000);//0.1s
+      sleep(1);
+    }
     rdtsc_64(tsc_l, tsc_u);
     log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
     memcpy(&array[recvnum][size + 28],&log_tsc,sizeof(unsigned long int));
     writen(fd, &array[recvnum], size + 36);
     recvnum++;
   }
-  
-  char ack[4];
-  readn(fd, ack, 4);
+  printf("num%d\n",recvnum);
+  int aaa = readn(fd, recvack, sizeof(recvack));
+  printf("ack%d\n",sizeof(recvack));
+  printf("read%s, aaa:%d\n",recvack, aaa);
   return 0;
 }
 
 int analyze(char *data, int fd){
-  int length = (int)data[0];
-  int command = (int)data[4];
+  //int length = *((int*)&data[0]);
+  int length = 0;
+  int command = 0;
   int winsize = 0;
-
+  
+  memcpy(&length,&data[0],4);
+  memcpy(&command,&data[4],4);
   memcpy(&winsize,&data[8],4);
-
+  
   int res = 0;
   int num = 0;
   char ack[4] = "ack";
@@ -207,11 +218,17 @@ void *loop (void* pArg){
   int *fd = (int*) pArg;
   char buf[16];
   int res;
+  printf("fd%d\n",*fd);
   while(1){
     readn(*fd, buf, 16);
     res = analyze(buf, *fd);
     if(res)break;
   }
+}
+
+void dummy()
+{
+  printf("sigpipe\n");
 }
 
 int main()
@@ -220,6 +237,15 @@ int main()
   listener = setup_socket();
   struct sockaddr_in client_addr;
   socklen_t client_addr_len = sizeof client_addr;
+  int rc = 0;
+  struct sigaction act;
+  memset(&act, 0, sizeof(act));
+  act.sa_handler = dummy; 
+  rc = sigaction(SIGPIPE, &act, NULL);
+  if(rc < 0){
+    printf("Error: sigaction() %s\n", strerror(errno));
+    return(-1);
+  }
   
   int i=0;
   for(i;i<2;i++){
@@ -227,7 +253,7 @@ int main()
     pthread_create(&handle, NULL, loop, &fd);
   }
   while (1){
-
+    sleep(1);
   }
   return 0;
 }

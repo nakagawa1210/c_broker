@@ -16,8 +16,8 @@
 #define rdtsc_64(lower, upper) asm __volatile ("rdtsc" : "=a"(lower), "=d" (upper));
 
 #define PORT_NO 9872
-#define MAX_COUNT 50000
-#define MEM_SIZE 1024
+#define MAX_COUNT 100000
+#define MEM_SIZE 5000
 
 ssize_t writen(int fd,const void *vptr, size_t n)
 {
@@ -68,9 +68,8 @@ ssize_t readn(int fd, void *buf, size_t count)
 
 void send_msg (char *host, int count, int len, int winsize)
 {
-  printf("%d\n",count);
   int msglen = len*1024;
-  char buf[msglen + 20];
+  char buf[MEM_SIZE];
   char iddata[16];
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   buf[msglen + 20] = '\0';
@@ -106,8 +105,8 @@ void send_msg (char *host, int count, int len, int winsize)
   int endnum = 9;
   char enddata[16];
 
-  memcpy(&iddata[0],&len,1);
-  memcpy(&iddata[4],&command,1);
+  memcpy(&iddata[0],&length,sizeof(length));
+  memcpy(&iddata[4],&command,sizeof(command));
   memcpy(&iddata[8],&winsize,sizeof(winsize));
   memcpy(&iddata[12],&dest,sizeof(dest));
 

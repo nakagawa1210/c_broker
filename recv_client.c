@@ -125,19 +125,17 @@ void recv_msg(char *host, int count)
   unsigned int tsc_l, tsc_u; //uint32_t
   unsigned long int tsc; //uint64_t
   unsigned long int log_tsc;
-  char ack[4] = "ack";
   char setdata[8];
   
   while(1) {
     writen(fd, iddata, sizeof(iddata));
+    printf("num:%d\n",datanum);
     readn(fd, setdata, 8);
-    
-    memcpy(&winsize,&setdata[0],4);
-    printf("win%d\n",winsize);
-    size = (int)setdata[4];
-
+    printf("num:%d\n",datanum);
+    memcpy(&size,&setdata[0],4);
+    memcpy(&winsize,&setdata[4],4);
     size = size * 1024;
-    printf("size%d\n",size);
+
     for (int i = 0;i < winsize; i++){
       readn(fd, buf, size + 36);
       rdtsc_64(tsc_l, tsc_u);
@@ -147,14 +145,16 @@ void recv_msg(char *host, int count)
       memcpy(&recv_time[datanum][2], &buf[size +28], sizeof(unsigned long int));
       memcpy(&recv_time[datanum][3], &log_tsc, sizeof(unsigned long int));
       datanum++;
-      printf("num%d\n",datanum);
-      }
-    writen(fd, ack, 4);
-  printf("ack\n");
+    }
+    
+    char ack[4] = "ack";
+    writen(fd, ack, sizeof(ack));
+    printf("num:%d\n",datanum);
     if(datanum == count)break;
   }
-  printf("break\n");
+  
   writen(fd, enddata, sizeof(enddata));
+  
 //	rdtsc_64(tsc_l, tsc_u);
 //	log_tsc[3][count] = (unsigned long int)tsc_u<<32 | tsc_l;
 //	memcpy(&log_tsc[0][count], buf, sizeof(unsigned long int));
@@ -185,6 +185,10 @@ void recv_msg(char *host, int count)
 
 int main(int argc, char *argv[])
 {
+  if (argc < 2){
+    printf("augument\n");
+    return 0;
+  }
   recv_msg("localhost", atoi(argv[1]));
   
   return 0;
