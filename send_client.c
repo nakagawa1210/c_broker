@@ -12,10 +12,10 @@
 #include <linux/sockios.h>
 #include <netdb.h>
 #include <stdlib.h>
-
+#include <netinet/tcp.h>
 #define rdtsc_64(lower, upper) asm __volatile ("rdtsc" : "=a"(lower), "=d" (upper));
 
-#define PORT_NO 9872
+#define PORT_NO 9999
 #define MAX_COUNT 100000
 #define MEM_SIZE 5000
 
@@ -66,7 +66,7 @@ ssize_t readn(int fd, void *buf, size_t count)
   return count;
 }
 
-void send_msg (char *host, int count, int len, int winsize)
+void send_msg (char *host, int port_no,int count, int len, int winsize)
 {
   int msglen = len*1024;
   char buf[MEM_SIZE];
@@ -89,7 +89,7 @@ void send_msg (char *host, int count, int len, int winsize)
   struct sockaddr_in addr;
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
-  addr.sin_port = htons(PORT_NO);
+  addr.sin_port = htons(port_no);
   memcpy(&addr.sin_addr, hp->h_addr, hp->h_length);
 
   //  char input = getchar();
@@ -128,6 +128,10 @@ void send_msg (char *host, int count, int len, int winsize)
 	  break;
 	}
   }
+  
+  int on=1;
+  int ret;
+  ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
 
   unsigned int tsc_l, tsc_u; //uint32_t
   unsigned long int log_tsc;
@@ -147,7 +151,7 @@ void send_msg (char *host, int count, int len, int winsize)
     readn(fd, ack, 4);
   }
   writen(fd, enddata, sizeof(enddata));
-  printf("close\n");
+
   if (close(fd) == -1) {
     printf("%d\n", errno);
   }
@@ -155,9 +159,8 @@ void send_msg (char *host, int count, int len, int winsize)
 
 int main (int argc, char *argv[])
 {
-  printf("start\n");
-  
-  send_msg("localhost", atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
-  printf("end\n");
+
+  send_msg("localhost",atoi(argv[1]),atoi(argv[2]),atoi(argv[3]),atoi(argv[4]));
+
   return 0;
 }

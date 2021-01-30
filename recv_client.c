@@ -13,7 +13,7 @@
 #define rdtsc_64(lower, upper) asm __volatile ("rdtsc" : "=a"(lower), "=d" (upper));
 
 #define CLOCK_HZ 2600000000.0
-#define PORT_NO 9872
+#define PORT_NO 9999
 #define MAX_BUF_SIZE 5000
 #define MAX_COUNT 100000
 
@@ -75,7 +75,7 @@ ssize_t writen(int fd,const void *vptr, size_t n)
   return n;
 }
 
-void recv_msg(char *host, int count)
+void recv_msg(char *host, int port_no, int count)
 {
   char buf[MAX_BUF_SIZE];
   uint64_t recv_time[MAX_COUNT][4];
@@ -101,7 +101,7 @@ void recv_msg(char *host, int count)
   struct sockaddr_in addr;
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
-  addr.sin_port = htons(PORT_NO);
+  addr.sin_port = htons(port_no);
   memcpy(&addr.sin_addr, hp->h_addr, hp->h_length);
 
   int len = 1;
@@ -137,14 +137,21 @@ void recv_msg(char *host, int count)
 
   unsigned long int log_tsc;
   char setdata[8];
+  int flag = 0;
+  char ack[4];
+  char endack[4];
   
-  while(1) {
-    writen(fd, iddata, sizeof(iddata));
-    readn(fd, setdata, 8);
-    memcpy(&size,&setdata[0],4);
-    memcpy(&winsize,&setdata[4],4);
-    size = size * 1024;
+  memcpy(&ack[0],&flag,sizeof(flag));
+  flag = 1;
+  memcpy(&endack[0],&flag,sizeof(flag));
+  
+  writen(fd, iddata, sizeof(iddata));
+  readn(fd, setdata, 8);
+  memcpy(&size,&setdata[0],4);
+  memcpy(&winsize,&setdata[4],4);
+  size = size * 1024;
 
+  while(1) {
     for (int i = 0;i < winsize; i++){
       readn(fd, buf, size + 36);
       log_tsc = gettsc();
@@ -154,13 +161,11 @@ void recv_msg(char *host, int count)
       memcpy(&recv_time[datanum][3], &log_tsc, sizeof(unsigned long int));
       datanum++;
     }
-    
-    char ack[4] = "ack";
-    writen(fd, ack, sizeof(ack));
     if(datanum == count)break;
+    writen(fd, ack, sizeof(ack));
   }
-  
-  writen(fd, enddata, sizeof(enddata));
+  writen(fd, endack, sizeof(endack));
+  //writen(fd, enddata, sizeof(enddata));
   
 //	rdtsc_64(tsc_l, tsc_u);
 //	log_tsc[3][count] = (unsigned long int)tsc_u<<32 | tsc_l;
@@ -196,7 +201,7 @@ int main(int argc, char *argv[])
     printf("augument\n");
     return 0;
   }
-  recv_msg("localhost", atoi(argv[1]));
+  recv_msg("localhost", atoi(argv[1]),atoi(argv[2]) );
   
   return 0;
 }

@@ -15,7 +15,7 @@
 #include <signal.h>
 #include <netinet/tcp.h>
 
-#define SERVER_PORT 9872
+#define SERVER_PORT 9999
 #define MAX_EVENTS 3000
 #define BACKLOG 10
 #define MAX_COUNT 100000
@@ -36,7 +36,7 @@ int recvnum = 0;
 void ackset(char *setbuf)
 {
   while((datanum - recvnum) <= 0){
-    sleep(1);
+    //sleep(1);
   }
   memcpy(&setbuf[0], &array[recvnum][0], 4);
   memcpy(&setbuf[4], &array[recvnum][8], 4);
@@ -50,7 +50,7 @@ static void die(const char* msg)
 
 static int listener;
 
-static int setup_socket()
+static int setup_socket(int port_no)
 {
   int sock;
   struct sockaddr_in sin;
@@ -66,7 +66,7 @@ static int setup_socket()
   memset(&sin, 0, sizeof sin);
   sin.sin_family = AF_INET;
   sin.sin_addr.s_addr = htonl(INADDR_ANY);
-  sin.sin_port = htons(SERVER_PORT);
+  sin.sin_port = htons(port_no);
 
   if (bind(sock, (struct sockaddr *) &sin, sizeof sin) < 0) {
     close(sock);
@@ -155,26 +155,29 @@ int recv_msg(int fd, char *databuf)
   char recvack[4];
   int size;
   int winsize;
+  int flag=0;
   
   memcpy(&size,&databuf[0],4);
   memcpy(&winsize,&databuf[4],4);
   size = size * 1024;
-  
-  for(int i = 0; i< winsize ;i++){
-    while((datanum - recvnum) <= 0){
-      //usleep(100000);//0.1s
-      sleep(1);
+  while (1){
+    if(flag)break;
+    for(int i = 0; i< winsize ;i++){
+      while((datanum - recvnum) <= 0){
+	//usleep(100000);//0.1s
+	//sleep(1);
+      }
+      rdtsc_64(tsc_l, tsc_u);
+      log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
+      memcpy(&array[recvnum][size + 28],&log_tsc,sizeof(unsigned long int));
+      writen(fd, &array[recvnum], size + 36);
+      recvnum++;
     }
-    rdtsc_64(tsc_l, tsc_u);
-    log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
-    memcpy(&array[recvnum][size + 28],&log_tsc,sizeof(unsigned long int));
-    writen(fd, &array[recvnum], size + 36);
-    recvnum++;
-  }
  
-  readn(fd, recvack, sizeof(recvack));
-  //printf("num:%d\n",recvnum);
-  return 0;
+    readn(fd, recvack, sizeof(recvack));
+    memcpy(&flag,&recvack[0],4);
+  }
+  return 1;
 }
 
 int analyze(char *data, int fd){
@@ -223,10 +226,10 @@ void *loop (void* pArg){
   }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
   pthread_t handle;
-  listener = setup_socket();
+  listener = setup_socket(atoi(argv[1]));
   struct sockaddr_in client_addr;
   socklen_t client_addr_len = sizeof client_addr;
   
