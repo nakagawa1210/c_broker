@@ -15,7 +15,7 @@
 #define CLOCK_HZ 2600000000.0
 #define PORT_NO 9999
 #define MAX_BUF_SIZE 5000
-#define MAX_COUNT 100000
+#define MAX_COUNT 200000
 
 unsigned long int gettsc()
 {

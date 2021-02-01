@@ -21,12 +21,11 @@
 #define MAX_COUNT 100000
 #define MAX_BUF_SIZE 5000
 #define MAX_FD_SIZE 1024
-#define HEAD_MAX 1000
-#define TALE 512
 
 #define rdtsc_64(lower, upper) asm __volatile ("rdtsc" : "=a"(lower), "=d" (upper));
 
-char array[100000][5000];
+char array[MAX_COUNT][MAX_BUF_SIZE];
+int ary_len[MAX_COUNT];
 
 int datanum = 0;
 int recvnum = 0;
@@ -155,7 +154,8 @@ int recv_msg(int fd, char *databuf)
   char recvack[4];
   int size;
   int winsize;
-  int flag=0;
+  int flag = 0;
+  int len = 0;
   
   memcpy(&size,&databuf[0],4);
   memcpy(&winsize,&databuf[4],4);
@@ -163,10 +163,14 @@ int recv_msg(int fd, char *databuf)
   while (1){
     if(flag)break;
     for(int i = 0; i< winsize ;i++){
-      while((datanum - recvnum) <= 0){
+      len = datanum - recvnum;
+      while(len <= 0){
 	//usleep(100000);//0.1s
 	//sleep(1);
+	len = datanum - recvnum;
       }
+      fprintf(stdout,"%d,%d\n",recvnum,len);
+      fflush(stdout);
       rdtsc_64(tsc_l, tsc_u);
       log_tsc = (unsigned long int)tsc_u<<32 | tsc_l;
       memcpy(&array[recvnum][size + 28],&log_tsc,sizeof(unsigned long int));
@@ -177,6 +181,7 @@ int recv_msg(int fd, char *databuf)
     readn(fd, recvack, sizeof(recvack));
     memcpy(&flag,&recvack[0],4);
   }
+  printf("end\n");
   return 1;
 }
 
