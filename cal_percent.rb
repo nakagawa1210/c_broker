@@ -6,10 +6,11 @@ end
 def main
   @data_sum = [0.0,0.0,0.0,0.0]
   
-  file = ARGV.size > 0 ?  ARGV[0] : exit                  
+  file_log = ARGV.size > 0 ?  ARGV[0] : exit #read TIME.log file
+  file_csv = 'log/' + file_log + '.csv'
   data =[]                                                
-  data_list = CSV.read(file) #read TIME.csv file
-  sp_file = file.split(".")
+  data_list = CSV.read(file_csv) 
+  sp_file = file_csv.split(".")
   filename = sp_file[0] + '+%' + '.' + sp_file[2]
   CSV.open(filename,'w') do |test|
     data_list.shift
@@ -25,7 +26,7 @@ def main
              per(@data_sum[0],@data_sum[3]),per(@data_sum[1],@data_sum[3]),
              per(@data_sum[2],@data_sum[3])]
   end
-  puts filename
+    puts filename
 end                                                       
                                                           
 main                                                      
