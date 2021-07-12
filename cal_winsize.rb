@@ -57,9 +57,9 @@ def main
     datalist.each do |data|
       next if data[0] == 0
       test << [data[0],
-               (1024 / data[1].to_f) / 10000,
-               (2048 / data[2].to_f) / 10000,
-               (4096 / data[3].to_f) / 10000]
+               (8*1024) / (data[1].to_f * 10000),
+               (8*2048) / (data[2].to_f * 10000),
+               (8*4096) / (data[3].to_f * 10000)]
     end
   end
 end
