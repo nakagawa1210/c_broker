@@ -1,11 +1,16 @@
-all: svr send recv
+.PHONY: all clean
+
+all: server send_client recv_client
 #recv
 
 #mybroker
 
-send: send_client.c
-	gcc send_client.c -o send_client -std=gnu99
-recv: recv_client.c
-	gcc recv_client.c -o recv_client -std=gnu99
-svr: server.c
-	gcc server.c -pthread -o server -std=gnu99
+send_client: send_client.c
+	gcc send_client.c -o send_client
+recv_client: recv_client.c
+	gcc recv_client.c -o recv_client
+server: server.c
+	gcc server.c -pthread -o server
+
+clean:
+	rm -f send_client recv_client server

@@ -70,9 +70,11 @@ void send_msg (char *host, int port_no,int count, int len, int winsize)
 {
   int msglen = len*1024;
   char buf[MEM_SIZE];
-  char iddata[16];
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
   buf[msglen + 20] = '\0';
+
+  char iddata[16];
+
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
 
   if (fd < 0) {
     perror("socket\n");
@@ -159,7 +161,11 @@ void send_msg (char *host, int port_no,int count, int len, int winsize)
 
 int main (int argc, char *argv[])
 {
-
+  if (argc != 4) {
+    fprintf(stderr, "%s: argument error (argc != 4)\n", __FILE__);
+    return 1;
+  }
+  
   send_msg("localhost",atoi(argv[1]),atoi(argv[2]),atoi(argv[3]),atoi(argv[4]));
 
   return 0;
